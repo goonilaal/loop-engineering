@@ -24,6 +24,7 @@ TYPESAFE_ENV_FILE=~/files/.env ./examples/calc/demo.sh loop.jev.toml   # Jev dec
 ./examples/calc/demo.sh loop.shadow.toml    # failure demo: a one-line unittest.py fakes every test (false exit 0)
 ./examples/calc/demo.sh loop.approve.toml   # human gate: y/N before each commit
 ./examples/calc/crash-demo.sh               # kill the loop mid-action, then resume
+./examples/calc/session-demo.sh             # the loop inside a pi session: asked to fix add, sent back until all checks pass
 ./examples/calc-bend/demo.sh                # Bend 2: every check is a machine-checked proof
 ./examples/calc-bend/demo.sh loop.cheat.toml   # failure demo: three ways to fake a proof, none gets through (exit 2)
 ./examples/churn/demo.sh                    # ML example: data contract, AUC bar, model card
