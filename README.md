@@ -73,6 +73,9 @@ actor = 'pi -p "$(cat)"'          # prompt arrives on stdin; "$(cat)" passes it 
 actor_timeout_s = 600
 fresh_clone = true                 # observe a fresh clone of HEAD (no stale local state)
 require_approval = false           # y/N prompt before each commit; denied without a TTY
+protected = ["test_calc.py"]       # glob patterns the actor may not change; any staged
+                                   # change to a matching file is rejected at admission.
+                                   # The manifest file itself is always protected.
 
 [[checks]]                         # desired state; order = target priority
 name = "add"
