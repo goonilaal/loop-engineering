@@ -76,6 +76,8 @@ require_approval = false           # y/N prompt before each commit; denied witho
 protected = ["test_calc.py"]       # glob patterns the actor may not change; any staged
                                    # change to a matching file is rejected at admission.
                                    # The manifest file itself is always protected.
+                                   # Built-in gates also reject newly added root-level files
+                                   # that shadow stdlib modules (e.g. a fake unittest.py).
 
 [[checks]]                         # desired state; order = target priority
 name = "add"

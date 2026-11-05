@@ -12,6 +12,9 @@ Failure modes from the K8s playbook and how this controller handles each:
 - Big-bang actions:     diffs larger than `max_diff_lines` are rejected and discarded.
 - Goalpost drift:       protected files (including the manifest itself) are rejected
                         at admission if the actor touches them.
+- Shadowed checks:      a newly added root-level file that shadows a stdlib module
+                        (e.g. a one-line `unittest.py` that exits 0) is rejected at
+                        admission, so a check cannot be faked by replacing its runner.
 """
 
 from __future__ import annotations
@@ -273,6 +276,23 @@ def protected_violations(m: Manifest, staged: list[str]) -> list[str]:
     return sorted(f for f in staged if protected_match(f, patterns))
 
 
+def stdlib_shadow_files(added: list[str]) -> list[str]:
+    """Newly added root-level files whose name shadows a stdlib module.
+
+    Checks run with the workdir on ``sys.path``, so a root-level
+    ``unittest.py`` replaces the stdlib runner for every check run from
+    that directory — the shadow demo's one-line fake. Nested files are
+    not on the default path, so they are out of scope here.
+    """
+    stdlib = sys.stdlib_module_names
+    out = []
+    for f in added:
+        p = Path(f)
+        if str(p.parent) == "." and p.suffix == ".py" and p.stem in stdlib:
+            out.append(f)
+    return sorted(out)
+
+
 def admit(m: Manifest, git: Git, outside_before: set[str], target: str, ask: Callable[[str], bool]) -> Gate:
     """Admission control for a proposed change, cheapest gate first."""
     new_outside = git.outside_snapshot() - outside_before
@@ -286,6 +306,9 @@ def admit(m: Manifest, git: Git, outside_before: set[str], target: str, ask: Cal
     violations = protected_violations(m, git.staged_files())
     if violations:
         return Gate(False, "protected_changed: " + ", ".join(violations), lines)
+    shadows = stdlib_shadow_files(git.staged_added_files())
+    if shadows:
+        return Gate(False, "stdlib_shadow: " + ", ".join(shadows) + " shadow stdlib modules", lines)
     env = {**os.environ, "LOOP_NAME": m.name, "LOOP_GOAL": m.goal, "LOOP_TARGET": target}
     for hook in m.admission:
         code, out = _sh(hook.run, m.workdir, hook.timeout_s, env=env)
@@ -337,6 +360,9 @@ def check_worktree(m: Manifest, git: Git) -> WorktreeCheck:
         violations = protected_violations(m, git.staged_files(env=env))
         gates.append({"name": "protected", "ok": not violations,
                       "detail": ("changed protected files: " + ", ".join(violations)) if violations else ""})
+        shadows = stdlib_shadow_files(git.staged_added_files(env=env))
+        gates.append({"name": "stdlib_shadow", "ok": not shadows,
+                      "detail": ("shadow stdlib modules: " + ", ".join(shadows)) if shadows else ""})
         for hook in m.admission:
             code, out = _sh(hook.run, m.workdir, hook.timeout_s, env=env)
             detail = "" if code == 0 else _tail(out, 500).strip() or f"exit {code}"
